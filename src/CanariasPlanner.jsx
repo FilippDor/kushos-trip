@@ -80,7 +80,7 @@ export default function CanariasPlanner() {
                     <span>{allocations[player]?.[act] || 0}</span>
                     <button
                       onClick={() => toggleMust(player, act)}
-                      className={\`px-2 py-1 rounded-lg \${musts[player]?.[act] ? 'bg-green-500 text-white' : 'bg-gray-200'}\`}
+                      className={`px-2 py-1 rounded-lg ${musts[player]?.[act] ? 'bg-green-500 text-white' : 'bg-gray-200'}`}
                     >
                       MUST
                     </button>

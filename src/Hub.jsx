@@ -9,24 +9,13 @@ const supabase = createClient(
   import.meta.env.VITE_SUPABASE_ANON_KEY
 )
 
-// Universal URL preview fetch
-const fetchUrlPreview = async (url) => {
-  try {
-    const res = await fetch(`/api/resolveUrl?url=${encodeURIComponent(url)}`)
-    if (!res.ok) return { title: url, image: '' }
-    const json = await res.json()
-    return { title: json.title || url, image: json.image || '' }
-  } catch {
-    return { title: url, image: '' }
-  }
-}
-
 export default function Hub() {
   const navigate = useNavigate()
   const [categories] = useState(['Beaches', 'Hiking', 'Nightlife', 'Culture', 'Food'])
   const [selectedCategory, setSelectedCategory] = useState(null)
   const [links, setLinks] = useState([])
   const [newLink, setNewLink] = useState('')
+  const [customTitle, setCustomTitle] = useState('')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -57,11 +46,12 @@ export default function Hub() {
     setSelectedCategory(null)
     setLinks([])
     setNewLink('')
+    setCustomTitle('')
   }
 
   const addLink = async () => {
-    const trimmed = newLink.trim()
-    if (!trimmed || !selectedCategory) return
+    const trimmedLink = newLink.trim()
+    if (!trimmedLink || !selectedCategory) return
 
     setSaving(true)
     try {
@@ -70,25 +60,24 @@ export default function Hub() {
         .from('hub_links')
         .select('*')
         .eq('category', selectedCategory)
-        .eq('url', trimmed)
+        .eq('url', trimmedLink)
         .maybeSingle()
 
       if (existing) {
         setLinks(prev => [...prev].sort((a, b) => (b.votes || 0) - (a.votes || 0)))
         setNewLink('')
+        setCustomTitle('')
         setSaving(false)
         return
       }
-
-      const preview = await fetchUrlPreview(trimmed)
 
       const { data: inserted, error } = await supabase
         .from('hub_links')
         .insert([{
           category: selectedCategory,
-          url: trimmed,
-          title: preview.title,
-          image: preview.image,
+          url: trimmedLink,
+          title: customTitle || trimmedLink,
+          image: '', // optional, leave empty
           votes: 0
         }])
         .select()
@@ -97,6 +86,7 @@ export default function Hub() {
 
       setLinks(prev => [...prev, inserted[0]].sort((a, b) => (b.votes || 0) - (a.votes || 0)))
       setNewLink('')
+      setCustomTitle('')
     } catch (err) {
       console.error('Add link failed', err)
       alert('Could not add link.')
@@ -160,12 +150,19 @@ export default function Hub() {
             <h2 className="text-2xl font-bold mb-4">{selectedCategory}</h2>
 
             {/* Add link */}
-            <div className="flex gap-2 mb-4">
+            <div className="flex flex-col gap-2 mb-4">
               <input
                 type="text"
                 value={newLink}
                 onChange={(e) => setNewLink(e.target.value)}
-                placeholder="Paste any link"
+                placeholder="Paste link"
+                className="border p-2 rounded flex-1"
+              />
+              <input
+                type="text"
+                value={customTitle}
+                onChange={(e) => setCustomTitle(e.target.value)}
+                placeholder="Optional custom title"
                 className="border p-2 rounded flex-1"
               />
               <button onClick={addLink} disabled={saving} className="px-4 py-2 bg-indigo-600 text-white rounded">

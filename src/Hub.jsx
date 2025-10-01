@@ -9,30 +9,13 @@ const supabase = createClient(
   import.meta.env.VITE_SUPABASE_ANON_KEY
 )
 
-// Validate all Google Maps URLs, including short links
-const isGoogleMapsUrl = (url) => {
-  try {
-    const u = new URL(url)
-    return (
-      u.hostname.includes('google.com') ||
-      u.hostname.includes('goo.gl') ||
-      u.hostname.includes('maps.app.goo.gl')
-    )
-  } catch {
-    return false
-  }
-}
-
-// Fetch title + image from Google Maps oEmbed
+// Resolve Google Maps preview
 const fetchGoogleMapsPreview = async (url) => {
   try {
-    const res = await fetch(`https://www.google.com/maps/oembed?url=${encodeURIComponent(url)}&format=json`)
+    const res = await fetch(`/api/resolveGoogleMaps?url=${encodeURIComponent(url)}`)
     if (!res.ok) return { title: url, image: '' }
     const json = await res.json()
-    return {
-      title: json.title || url,
-      image: json.thumbnail_url || ''
-    }
+    return { title: json.title || url, image: json.image || '' }
   } catch {
     return { title: url, image: '' }
   }
@@ -46,6 +29,15 @@ export default function Hub() {
   const [newLink, setNewLink] = useState('')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  const isShareGoogleUrl = (url) => {
+    try {
+      const u = new URL(url)
+      return u.hostname === 'share.google'
+    } catch {
+      return false
+    }
+  }
 
   const fetchLinks = async (category) => {
     setLoading(true)
@@ -80,8 +72,8 @@ export default function Hub() {
     const trimmed = newLink.trim()
     if (!trimmed || !selectedCategory) return
 
-    if (!isGoogleMapsUrl(trimmed)) {
-      alert('Only Google Maps links are allowed.')
+    if (!isShareGoogleUrl(trimmed)) {
+      alert('Only share.google links are allowed.')
       return
     }
 
@@ -187,7 +179,7 @@ export default function Hub() {
                 type="text"
                 value={newLink}
                 onChange={(e) => setNewLink(e.target.value)}
-                placeholder="Paste Google Maps link"
+                placeholder="Paste share.google link"
                 className="border p-2 rounded flex-1"
               />
               <button onClick={addLink} disabled={saving} className="px-4 py-2 bg-indigo-600 text-white rounded">

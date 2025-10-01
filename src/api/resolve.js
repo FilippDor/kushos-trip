@@ -1,21 +1,29 @@
-// /api/preview.js
+import fetch from 'node-fetch'
+import * as cheerio from 'cheerio'
 
-export default async function handler(req, res) {
+export async function handler(req, res) {
+  const { url } = req.query
+
+  if (!url) {
+    return res.status(400).json({ error: 'Missing url parameter' })
+  }
+
   try {
-    const url = req.query.url
-    if (!url) return res.status(400).json({ error: 'Missing URL' })
+    // Follow the short link to the final Google Maps page
+    const response = await fetch(url, { redirect: 'follow' })
+    const html = await response.text()
 
-    const oembedUrl = `https://www.google.com/maps/oembed?url=${encodeURIComponent(url)}&format=json`
-    const response = await fetch(oembedUrl)
-    if (!response.ok) return res.status(200).json({ title: url, image: '' })
+    // Parse HTML to extract <title> and og:image
+    const $ = cheerio.load(html)
+    const title = $('title').text() || url
+    const image =
+      $('meta[property="og:image"]').attr('content') ||
+      $('link[rel="icon"]').attr('href') ||
+      ''
 
-    const data = await response.json()
-    res.status(200).json({
-      title: data.title || url,
-      image: data.thumbnail_url || ''
-    })
+    return res.status(200).json({ title, image })
   } catch (err) {
-    console.error(err)
-    res.status(500).json({ title: req.query.url || '', image: '' })
+    console.error('Error resolving Google Maps URL:', err)
+    return res.status(500).json({ title: url, image: '' })
   }
 }

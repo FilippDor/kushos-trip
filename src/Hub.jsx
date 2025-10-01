@@ -9,6 +9,18 @@ const supabase = createClient(
   import.meta.env.VITE_SUPABASE_ANON_KEY
 )
 
+// Fetch Google Maps preview from serverless resolver
+const fetchGoogleMapsPreview = async (url) => {
+  try {
+    const res = await fetch(`/api/resolveGoogleMaps?url=${encodeURIComponent(url)}`)
+    if (!res.ok) return { title: url, image: '' }
+    const json = await res.json()
+    return { title: json.title || url, image: json.image || '' }
+  } catch {
+    return { title: url, image: '' }
+  }
+}
+
 export default function Hub() {
   const navigate = useNavigate()
   const [categories] = useState(['Beaches', 'Hiking', 'Nightlife', 'Culture', 'Food'])
@@ -17,6 +29,15 @@ export default function Hub() {
   const [newLink, setNewLink] = useState('')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  const isShareGoogleUrl = (url) => {
+    try {
+      const u = new URL(url)
+      return u.hostname === 'share.google'
+    } catch {
+      return false
+    }
+  }
 
   const fetchLinks = async (category) => {
     setLoading(true)
@@ -47,20 +68,14 @@ export default function Hub() {
     setNewLink('')
   }
 
-  // Fetch Google Maps preview via serverless function
-  const fetchGoogleMapsPreview = async (url) => {
-    try {
-      const res = await fetch(`/api/preview?url=${encodeURIComponent(url)}`)
-      const json = await res.json()
-      return { title: json.title, image: json.image }
-    } catch {
-      return { title: url, image: '' }
-    }
-  }
-
   const addLink = async () => {
-    const trimmed = (newLink || '').trim()
+    const trimmed = newLink.trim()
     if (!trimmed || !selectedCategory) return
+
+    if (!isShareGoogleUrl(trimmed)) {
+      alert('Only share.google links are allowed.')
+      return
+    }
 
     setSaving(true)
     try {
@@ -97,7 +112,7 @@ export default function Hub() {
       setLinks(prev => [...prev, inserted[0]].sort((a, b) => (b.votes || 0) - (a.votes || 0)))
       setNewLink('')
     } catch (err) {
-      console.error('Error adding link:', err)
+      console.error('Add link failed', err)
       alert('Could not add link.')
     } finally {
       setSaving(false)
@@ -114,9 +129,13 @@ export default function Hub() {
         .eq('id', linkId)
         .select()
       if (error) throw error
-      setLinks(prev => prev.map(l => (l.id === linkId ? data[0] : l)).sort((a, b) => (b.votes || 0) - (a.votes || 0)))
+      setLinks(prev =>
+        prev
+          .map(l => (l.id === linkId ? data[0] : l))
+          .sort((a, b) => (b.votes || 0) - (a.votes || 0))
+      )
     } catch (err) {
-      console.error('Error upvoting:', err)
+      console.error('Upvote failed', err)
     }
   }
 
@@ -126,7 +145,7 @@ export default function Hub() {
       await supabase.from('hub_links').delete().eq('id', linkId)
       setLinks(prev => prev.filter(l => l.id !== linkId))
     } catch (err) {
-      console.error('Error deleting:', err)
+      console.error('Delete failed', err)
     }
   }
 
@@ -160,7 +179,7 @@ export default function Hub() {
                 type="text"
                 value={newLink}
                 onChange={(e) => setNewLink(e.target.value)}
-                placeholder="Paste Google Maps link"
+                placeholder="Paste share.google link"
                 className="border p-2 rounded flex-1"
               />
               <button onClick={addLink} disabled={saving} className="px-4 py-2 bg-indigo-600 text-white rounded">
@@ -175,9 +194,7 @@ export default function Hub() {
                 {links.map(link => (
                   <li key={link.id} className="border rounded p-3 flex flex-col gap-2">
                     <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3">
-                      {link.image && (
-                        <img src={link.image} alt={link.title} className="w-20 h-16 object-cover rounded" />
-                      )}
+                      {link.image && <img src={link.image} alt={link.title} className="w-20 h-16 object-cover rounded" />}
                       <div>{link.title || link.url}</div>
                     </a>
 

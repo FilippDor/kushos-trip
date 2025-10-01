@@ -9,13 +9,30 @@ const supabase = createClient(
   import.meta.env.VITE_SUPABASE_ANON_KEY
 )
 
-// Fetch Google Maps preview from serverless resolver
+// Validate all Google Maps URLs, including short links
+const isGoogleMapsUrl = (url) => {
+  try {
+    const u = new URL(url)
+    return (
+      u.hostname.includes('google.com') ||
+      u.hostname.includes('goo.gl') ||
+      u.hostname.includes('maps.app.goo.gl')
+    )
+  } catch {
+    return false
+  }
+}
+
+// Fetch title + image from Google Maps oEmbed
 const fetchGoogleMapsPreview = async (url) => {
   try {
-    const res = await fetch(`/api/resolveGoogleMaps?url=${encodeURIComponent(url)}`)
+    const res = await fetch(`https://www.google.com/maps/oembed?url=${encodeURIComponent(url)}&format=json`)
     if (!res.ok) return { title: url, image: '' }
     const json = await res.json()
-    return { title: json.title || url, image: json.image || '' }
+    return {
+      title: json.title || url,
+      image: json.thumbnail_url || ''
+    }
   } catch {
     return { title: url, image: '' }
   }
@@ -29,15 +46,6 @@ export default function Hub() {
   const [newLink, setNewLink] = useState('')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-
-  const isShareGoogleUrl = (url) => {
-    try {
-      const u = new URL(url)
-      return u.hostname === 'share.google'
-    } catch {
-      return false
-    }
-  }
 
   const fetchLinks = async (category) => {
     setLoading(true)
@@ -72,8 +80,8 @@ export default function Hub() {
     const trimmed = newLink.trim()
     if (!trimmed || !selectedCategory) return
 
-    if (!isShareGoogleUrl(trimmed)) {
-      alert('Only share.google links are allowed.')
+    if (!isGoogleMapsUrl(trimmed)) {
+      alert('Only Google Maps links are allowed.')
       return
     }
 
@@ -179,7 +187,7 @@ export default function Hub() {
                 type="text"
                 value={newLink}
                 onChange={(e) => setNewLink(e.target.value)}
-                placeholder="Paste share.google link"
+                placeholder="Paste Google Maps link"
                 className="border p-2 rounded flex-1"
               />
               <button onClick={addLink} disabled={saving} className="px-4 py-2 bg-indigo-600 text-white rounded">
@@ -194,7 +202,9 @@ export default function Hub() {
                 {links.map(link => (
                   <li key={link.id} className="border rounded p-3 flex flex-col gap-2">
                     <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3">
-                      {link.image && <img src={link.image} alt={link.title} className="w-20 h-16 object-cover rounded" />}
+                      {link.image && (
+                        <img src={link.image} alt={link.title} className="w-20 h-16 object-cover rounded" />
+                      )}
                       <div>{link.title || link.url}</div>
                     </a>
 

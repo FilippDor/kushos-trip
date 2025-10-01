@@ -9,10 +9,10 @@ const supabase = createClient(
   import.meta.env.VITE_SUPABASE_ANON_KEY
 )
 
-// Resolve Google Maps preview
-const fetchGoogleMapsPreview = async (url) => {
+// Universal URL preview fetch
+const fetchUrlPreview = async (url) => {
   try {
-    const res = await fetch(`/api/resolveGoogleMaps?url=${encodeURIComponent(url)}`)
+    const res = await fetch(`/api/resolveUrl?url=${encodeURIComponent(url)}`)
     if (!res.ok) return { title: url, image: '' }
     const json = await res.json()
     return { title: json.title || url, image: json.image || '' }
@@ -29,15 +29,6 @@ export default function Hub() {
   const [newLink, setNewLink] = useState('')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-
-  const isShareGoogleUrl = (url) => {
-    try {
-      const u = new URL(url)
-      return u.hostname === 'share.google'
-    } catch {
-      return false
-    }
-  }
 
   const fetchLinks = async (category) => {
     setLoading(true)
@@ -72,11 +63,6 @@ export default function Hub() {
     const trimmed = newLink.trim()
     if (!trimmed || !selectedCategory) return
 
-    if (!isShareGoogleUrl(trimmed)) {
-      alert('Only share.google links are allowed.')
-      return
-    }
-
     setSaving(true)
     try {
       // prevent duplicate
@@ -94,7 +80,7 @@ export default function Hub() {
         return
       }
 
-      const preview = await fetchGoogleMapsPreview(trimmed)
+      const preview = await fetchUrlPreview(trimmed)
 
       const { data: inserted, error } = await supabase
         .from('hub_links')
@@ -179,7 +165,7 @@ export default function Hub() {
                 type="text"
                 value={newLink}
                 onChange={(e) => setNewLink(e.target.value)}
-                placeholder="Paste share.google link"
+                placeholder="Paste any link"
                 className="border p-2 rounded flex-1"
               />
               <button onClick={addLink} disabled={saving} className="px-4 py-2 bg-indigo-600 text-white rounded">
